@@ -18,9 +18,10 @@ func main() {
 	log.Println("Beginning")
 	minSupport = 0
 
-	toTree := make(chan []int)
+	toTree := make(chan []int, 100000)
 
 	countWords()
+	wg.Add(1)
 	go treeConstuct(toTree)
 	readTransactions(toTree)
 

@@ -9,7 +9,6 @@ import (
 )
 
 func treeConstuct(c chan []int) {
-	wg.Add(1)
 	defer wg.Done()
 	root := emptyTree()
 	for transaction := range c {
@@ -20,7 +19,7 @@ func treeConstuct(c chan []int) {
 		}
 	}
 	log.Println("Created tree")
-	root.print()
+	//root.print()
 }
 
 func countWords() {
@@ -58,20 +57,19 @@ func readTransactions(toTree chan []int) {
 
 	scanner := bufio.NewScanner(file)
 
-top:
 	for scanner.Scan() {
 		s := strings.Split(scanner.Text(), ",")
 		transaction := make([]int, len(s))
-		for i, item := range s {
-			transaction[i] = tokens[item]
-		}
-		sort.Sort(byCounts(transaction))
-		for i, s := range transaction {
-			if counts[s] < minSupport {
-				toTree <- transaction[:i]
-				continue top
+		j := 0
+		for _, token := range s {
+			id := tokens[token]
+			if counts[id] >= minSupport {
+				transaction[j] = id
+				j++
 			}
 		}
+		transaction = transaction[:j]
+		sort.Sort(byCounts(transaction))
 		toTree <- transaction
 	}
 	close(toTree)
