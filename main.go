@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-
-	"github.com/chrislusf/glow/flow"
 )
 
 var counts map[int]int
@@ -82,7 +80,7 @@ func treeConstuct(c chan []int) {
 		}
 	}
 	log.Println("Created tree")
-	root.print()
+	//root.print()
 }
 
 func main() {
@@ -90,7 +88,7 @@ func main() {
 	counts = make(map[int]int)
 	tokens = make(map[string]int)
 	itemStrings = make(map[int]string)
-	minSupport = 4
+	minSupport = 0
 
 	toTree := make(chan []int)
 	wg.Add(1)
@@ -118,32 +116,31 @@ func main() {
 	}
 
 	log.Println("Counted items")
+	file, err = os.Open(os.Args[1])
+	if err != nil {
+		log.Panicf("Can not open file %s: %v", os.Args[1], err)
+		return
+	}
+	defer file.Close()
 
-	flow.New().TextFile(
-		os.Args[1], 3,
-	).Map(func(line string) []int {
-		s := strings.Split(line, ",")
+	scanner = bufio.NewScanner(file)
+
+top:
+	for scanner.Scan() {
+		s := strings.Split(scanner.Text(), ",")
 		transaction := make([]int, len(s))
 		for i, item := range s {
 			transaction[i] = tokens[item]
 		}
 		sort.Sort(byCounts(transaction))
-		return transaction
-	}).Map(func(transaction []int) []int {
 		for i, s := range transaction {
 			if counts[s] < minSupport {
-				return transaction[:i]
+				toTree <- transaction[:i]
+				continue top
 			}
 		}
-		return transaction
-	}).Map(func(transaction []int) {
-		/*var buffer bytes.Buffer
-		for _, s := range transaction {
-			buffer.WriteString(fmt.Sprintf("(%s,%d),", s, counts[s]))
-		}
-		fmt.Println(buffer.String())*/
 		toTree <- transaction
-	}).Run()
+	}
 	close(toTree)
 	log.Println("Read transactions")
 
