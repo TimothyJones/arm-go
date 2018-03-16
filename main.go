@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -11,12 +12,14 @@ import (
 	"github.com/chrislusf/glow/flow"
 )
 
-var counts map[string]int
+var counts map[int]int
+var tokens map[string]int
+var itemStrings map[int]string
 var minSupport int
 
 var wg sync.WaitGroup
 
-type byCounts []string
+type byCounts []int
 
 func (s byCounts) Len() int {
 	return len(s)
@@ -29,20 +32,20 @@ func (s byCounts) Less(i, j int) bool {
 }
 
 type tree struct {
-	Value    string
+	Value    int
 	Count    int
-	Children map[string]*tree
+	Children map[int]*tree
 }
 
 func emptyTree() *tree {
-	return &tree{"", 0, make(map[string]*tree)}
+	return &tree{0, 0, make(map[int]*tree)}
 }
 
-func newNode(value string) *tree {
-	return &tree{value, 0, make(map[string]*tree)}
+func newNode(value int) *tree {
+	return &tree{value, 0, make(map[int]*tree)}
 }
 
-func (t *tree) insert(value string) *tree {
+func (t *tree) insert(value int) *tree {
 	node, ok := t.Children[value]
 	if !ok {
 		node = newNode(value)
@@ -56,10 +59,10 @@ func (t *tree) print() {
 	/*	if t.Count < minSupport {
 		return
 	}*/
-	if t.Value == "" {
+	if t.Value == 0 {
 		fmt.Printf("( Root count: %d ", t.Count)
 	} else {
-		fmt.Printf("( item: %s, count: %d ", t.Value, t.Count)
+		fmt.Printf("( item: %s, count: %d ", itemStrings[t.Value], t.Count)
 	}
 	for _, v := range t.Children {
 		v.print()
@@ -68,7 +71,7 @@ func (t *tree) print() {
 
 }
 
-func treeConstuct(c chan []string) {
+func treeConstuct(c chan []int) {
 	defer wg.Done()
 	root := emptyTree()
 	for transaction := range c {
@@ -79,48 +82,61 @@ func treeConstuct(c chan []string) {
 		}
 	}
 	log.Println("Created tree")
-	//root.print()
+	root.print()
 }
 
 func main() {
 	log.Println("Beginning")
-	counts = make(map[string]int)
+	counts = make(map[int]int)
+	tokens = make(map[string]int)
+	itemStrings = make(map[int]string)
 	minSupport = 4
 
-	toTree := make(chan []string)
+	toTree := make(chan []int)
 	wg.Add(1)
 	go treeConstuct(toTree)
 
-	flow.New().TextFile(
-		os.Args[1], 3,
-	).Map(func(line string, ch chan string) {
-		for _, token := range strings.Split(line, ",") {
-			ch <- token
+	file, err := os.Open(os.Args[1])
+	if err != nil {
+		log.Panicf("Can not open file %s: %v", os.Args[1], err)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	tokenId := 1
+	for scanner.Scan() {
+		for _, token := range strings.Split(scanner.Text(), ",") {
+			if _, ok := tokens[token]; !ok {
+				tokens[token] = tokenId
+				itemStrings[tokenId] = token
+				tokenId++
+			}
+			id := tokens[token]
+			counts[id] = counts[id] + 1
 		}
-	}).Map(func(key string) (string, int) {
-		return key, 1
-	}).ReduceByKey(func(x int, y int) int {
-		return x + y
-	}).Map(func(key string, value int) {
-		counts[key] = value
-	}).Run()
+	}
 
 	log.Println("Counted items")
 
 	flow.New().TextFile(
 		os.Args[1], 3,
-	).Map(func(line string) []string {
+	).Map(func(line string) []int {
 		s := strings.Split(line, ",")
-		sort.Sort(byCounts(s))
-		return s
-	}).Map(func(transaction []string) []string {
+		transaction := make([]int, len(s))
+		for i, item := range s {
+			transaction[i] = tokens[item]
+		}
+		sort.Sort(byCounts(transaction))
+		return transaction
+	}).Map(func(transaction []int) []int {
 		for i, s := range transaction {
 			if counts[s] < minSupport {
 				return transaction[:i]
 			}
 		}
 		return transaction
-	}).Map(func(transaction []string) {
+	}).Map(func(transaction []int) {
 		/*var buffer bytes.Buffer
 		for _, s := range transaction {
 			buffer.WriteString(fmt.Sprintf("(%s,%d),", s, counts[s]))
