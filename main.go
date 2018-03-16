@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -77,10 +78,12 @@ func treeConstuct(c chan []string) {
 			current = current.insert(item)
 		}
 	}
-	root.print()
+	log.Println("Created tree")
+	//root.print()
 }
 
 func main() {
+	log.Println("Beginning")
 	counts = make(map[string]int)
 	minSupport = 4
 
@@ -101,6 +104,8 @@ func main() {
 	}).Map(func(key string, value int) {
 		counts[key] = value
 	}).Run()
+
+	log.Println("Counted items")
 
 	flow.New().TextFile(
 		os.Args[1], 3,
@@ -124,6 +129,7 @@ func main() {
 		toTree <- transaction
 	}).Run()
 	close(toTree)
+	log.Println("Read transactions")
 
 	wg.Wait()
 	/*ufoar key := range counts {
