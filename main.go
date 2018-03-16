@@ -83,17 +83,7 @@ func treeConstuct(c chan []int) {
 	//root.print()
 }
 
-func main() {
-	log.Println("Beginning")
-	counts = make(map[int]int)
-	tokens = make(map[string]int)
-	itemStrings = make(map[int]string)
-	minSupport = 0
-
-	toTree := make(chan []int)
-	wg.Add(1)
-	go treeConstuct(toTree)
-
+func countWords() {
 	file, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Panicf("Can not open file %s: %v", os.Args[1], err)
@@ -116,14 +106,17 @@ func main() {
 	}
 
 	log.Println("Counted items")
-	file, err = os.Open(os.Args[1])
+}
+
+func readTransactions(toTree chan []int) {
+	file, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Panicf("Can not open file %s: %v", os.Args[1], err)
 		return
 	}
 	defer file.Close()
 
-	scanner = bufio.NewScanner(file)
+	scanner := bufio.NewScanner(file)
 
 top:
 	for scanner.Scan() {
@@ -142,7 +135,23 @@ top:
 		toTree <- transaction
 	}
 	close(toTree)
+
 	log.Println("Read transactions")
+}
+
+func main() {
+	log.Println("Beginning")
+	counts = make(map[int]int)
+	tokens = make(map[string]int)
+	itemStrings = make(map[int]string)
+	minSupport = 0
+
+	toTree := make(chan []int)
+	wg.Add(1)
+	go treeConstuct(toTree)
+
+	countWords()
+	readTransactions(toTree)
 
 	wg.Wait()
 	/*ufoar key := range counts {
